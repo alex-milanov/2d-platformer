@@ -1,0 +1,46 @@
+{
+  "name": "2d-scroller",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "prebuild": "node bin/move-assets.js",
+    "build": "npm run build:js && npm run build:sass",
+    "build:js": "browserify src/js/index.js -o dist/js/app.js",
+    "build:sass": "node-sass --include-path=$(node bin/sass-paths.js) src/sass/style.sass dist/css/style.css",
+    "watch": "npm run watch:js & npm run watch:sass & npm run livereload",
+    "watch:js": "nodemon --watch 'src/js' --exec 'npm run build:js'",
+    "watch:sass": "npm run build:sass -- --watch src/sass/**/*",
+    "livereload": "livereload dist",
+    "start": "npm run build && serve & npm run watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alex-milanov/2d-scroller.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/alex-milanov/2d-scroller/issues"
+  },
+  "homepage": "https://github.com/alex-milanov/2d-scroller#readme",
+  "devDependencies": {
+    "browserify": "^13.1.0",
+    "eslint": "^3.4.0",
+    "eslint-config-google": "^0.6.0",
+    "fs-extra": "^0.30.0",
+    "livereload": "^0.5.0",
+    "node-sass": "^3.8.0",
+    "node-serve": "0.0.3",
+    "nodemon": "^1.10.2"
+  },
+  "dependencies": {
+    "bourbon": "^4.2.7",
+    "bourbon-neat": "^1.8.0",
+    "font-awesome": "^4.6.3",
+    "raf-stream": "^3.0.0",
+    "rx": "^4.1.0",
+    "rx-node": "^1.0.2",
+    "snabbdom": "^0.5.1"
+  }
+}

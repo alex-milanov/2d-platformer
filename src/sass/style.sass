@@ -1,0 +1,31 @@
+
+@import "bourbon"
+@import "neat"
+
+#game
+	display: block
+	position: absolute
+	top: 0px
+	left: 0px
+	bottom: 0px
+	right: 0px
+	+background(linear-gradient(#abf, #78d) top repeat)
+	#ground
+		display: block
+		position: absolute
+		left: 0px
+		bottom: 0px
+		right: 0px
+		height: 128px
+		background: url("../../assets/ground-grass.png") top left repeat-x, url("../../assets/ground.png") bottom left repeat-x
+		background-size: 64px
+	#player
+		display: block
+		position: absolute
+		left: 0px
+		bottom: 128px
+		right: 0px
+		height: 64px
+		width: 64px
+		background: url("../../assets/player.png") center no-repeat
+		background-size: 42px
