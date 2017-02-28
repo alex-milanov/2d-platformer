@@ -17,7 +17,7 @@
 		bottom: 0px
 		right: 0px
 		height: 128px
-		background: url("../../assets/ground-grass.png") top left repeat-x, url("../../assets/ground.png") bottom left repeat-x
+		background: url("../../assets/ground-grass.png") top left repeat-x, url("../../assets/ground.png") 0px 64px repeat
 		background-size: 64px
 	#player
 		display: block
@@ -29,3 +29,5 @@
 		width: 64px
 		background: url("../../assets/player.png") center no-repeat
 		background-size: 42px
+		&.left
+			transform: scaleX(-1)

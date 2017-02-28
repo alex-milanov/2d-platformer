@@ -13192,53 +13192,868 @@ var ReactiveTest = Rx.ReactiveTest = {
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{"_process":3}],8:[function(require,module,exports){
+var VNode = require('./vnode');
+var is = require('./is');
+
+function addNS(data, children, sel) {
+  data.ns = 'http://www.w3.org/2000/svg';
+
+  if (sel !== 'foreignObject' && children !== undefined) {
+    for (var i = 0; i < children.length; ++i) {
+      addNS(children[i].data, children[i].children, children[i].sel);
+    }
+  }
+}
+
+module.exports = function h(sel, b, c) {
+  var data = {}, children, text, i;
+  if (c !== undefined) {
+    data = b;
+    if (is.array(c)) { children = c; }
+    else if (is.primitive(c)) { text = c; }
+  } else if (b !== undefined) {
+    if (is.array(b)) { children = b; }
+    else if (is.primitive(b)) { text = b; }
+    else { data = b; }
+  }
+  if (is.array(children)) {
+    for (i = 0; i < children.length; ++i) {
+      if (is.primitive(children[i])) children[i] = VNode(undefined, undefined, undefined, children[i]);
+    }
+  }
+  if (sel[0] === 's' && sel[1] === 'v' && sel[2] === 'g') {
+    addNS(data, children, sel);
+  }
+  return VNode(sel, data, children, text, undefined);
+};
+
+},{"./is":10,"./vnode":16}],9:[function(require,module,exports){
+function createElement(tagName){
+  return document.createElement(tagName);
+}
+
+function createElementNS(namespaceURI, qualifiedName){
+  return document.createElementNS(namespaceURI, qualifiedName);
+}
+
+function createTextNode(text){
+  return document.createTextNode(text);
+}
+
+
+function insertBefore(parentNode, newNode, referenceNode){
+  parentNode.insertBefore(newNode, referenceNode);
+}
+
+
+function removeChild(node, child){
+  node.removeChild(child);
+}
+
+function appendChild(node, child){
+  node.appendChild(child);
+}
+
+function parentNode(node){
+  return node.parentElement;
+}
+
+function nextSibling(node){
+  return node.nextSibling;
+}
+
+function tagName(node){
+  return node.tagName;
+}
+
+function setTextContent(node, text){
+  node.textContent = text;
+}
+
+module.exports = {
+  createElement: createElement,
+  createElementNS: createElementNS,
+  createTextNode: createTextNode,
+  appendChild: appendChild,
+  removeChild: removeChild,
+  insertBefore: insertBefore,
+  parentNode: parentNode,
+  nextSibling: nextSibling,
+  tagName: tagName,
+  setTextContent: setTextContent
+};
+
+},{}],10:[function(require,module,exports){
+module.exports = {
+  array: Array.isArray,
+  primitive: function(s) { return typeof s === 'string' || typeof s === 'number'; },
+};
+
+},{}],11:[function(require,module,exports){
+function updateClass(oldVnode, vnode) {
+  var cur, name, elm = vnode.elm,
+      oldClass = oldVnode.data.class,
+      klass = vnode.data.class;
+
+  if (!oldClass && !klass) return;
+  oldClass = oldClass || {};
+  klass = klass || {};
+
+  for (name in oldClass) {
+    if (!klass[name]) {
+      elm.classList.remove(name);
+    }
+  }
+  for (name in klass) {
+    cur = klass[name];
+    if (cur !== oldClass[name]) {
+      elm.classList[cur ? 'add' : 'remove'](name);
+    }
+  }
+}
+
+module.exports = {create: updateClass, update: updateClass};
+
+},{}],12:[function(require,module,exports){
+var is = require('../is');
+
+function arrInvoker(arr) {
+  return function() {
+    if (!arr.length) return;
+    // Special case when length is two, for performance
+    arr.length === 2 ? arr[0](arr[1]) : arr[0].apply(undefined, arr.slice(1));
+  };
+}
+
+function fnInvoker(o) {
+  return function(ev) { 
+    if (o.fn === null) return;
+    o.fn(ev); 
+  };
+}
+
+function updateEventListeners(oldVnode, vnode) {
+  var name, cur, old, elm = vnode.elm,
+      oldOn = oldVnode.data.on, on = vnode.data.on;
+
+  if (!on && !oldOn) return;
+  on = on || {};
+  oldOn = oldOn || {};
+
+  for (name in on) {
+    cur = on[name];
+    old = oldOn[name];
+    if (old === undefined) {
+      if (is.array(cur)) {
+        elm.addEventListener(name, arrInvoker(cur));
+      } else {
+        cur = {fn: cur};
+        on[name] = cur;
+        elm.addEventListener(name, fnInvoker(cur));
+      }
+    } else if (is.array(old)) {
+      // Deliberately modify old array since it's captured in closure created with `arrInvoker`
+      old.length = cur.length;
+      for (var i = 0; i < old.length; ++i) old[i] = cur[i];
+      on[name]  = old;
+    } else {
+      old.fn = cur;
+      on[name] = old;
+    }
+  }
+  if (oldOn) {
+    for (name in oldOn) {
+      if (on[name] === undefined) {
+        var old = oldOn[name];
+        if (is.array(old)) {
+          old.length = 0;
+        }
+        else {
+          old.fn = null;
+        }
+      }
+    }
+  }
+}
+
+module.exports = {create: updateEventListeners, update: updateEventListeners};
+
+},{"../is":10}],13:[function(require,module,exports){
+function updateProps(oldVnode, vnode) {
+  var key, cur, old, elm = vnode.elm,
+      oldProps = oldVnode.data.props, props = vnode.data.props;
+
+  if (!oldProps && !props) return;
+  oldProps = oldProps || {};
+  props = props || {};
+
+  for (key in oldProps) {
+    if (!props[key]) {
+      delete elm[key];
+    }
+  }
+  for (key in props) {
+    cur = props[key];
+    old = oldProps[key];
+    if (old !== cur && (key !== 'value' || elm[key] !== cur)) {
+      elm[key] = cur;
+    }
+  }
+}
+
+module.exports = {create: updateProps, update: updateProps};
+
+},{}],14:[function(require,module,exports){
+var raf = (typeof window !== 'undefined' && window.requestAnimationFrame) || setTimeout;
+var nextFrame = function(fn) { raf(function() { raf(fn); }); };
+
+function setNextFrame(obj, prop, val) {
+  nextFrame(function() { obj[prop] = val; });
+}
+
+function updateStyle(oldVnode, vnode) {
+  var cur, name, elm = vnode.elm,
+      oldStyle = oldVnode.data.style,
+      style = vnode.data.style;
+
+  if (!oldStyle && !style) return;
+  oldStyle = oldStyle || {};
+  style = style || {};
+  var oldHasDel = 'delayed' in oldStyle;
+
+  for (name in oldStyle) {
+    if (!style[name]) {
+      elm.style[name] = '';
+    }
+  }
+  for (name in style) {
+    cur = style[name];
+    if (name === 'delayed') {
+      for (name in style.delayed) {
+        cur = style.delayed[name];
+        if (!oldHasDel || cur !== oldStyle.delayed[name]) {
+          setNextFrame(elm.style, name, cur);
+        }
+      }
+    } else if (name !== 'remove' && cur !== oldStyle[name]) {
+      elm.style[name] = cur;
+    }
+  }
+}
+
+function applyDestroyStyle(vnode) {
+  var style, name, elm = vnode.elm, s = vnode.data.style;
+  if (!s || !(style = s.destroy)) return;
+  for (name in style) {
+    elm.style[name] = style[name];
+  }
+}
+
+function applyRemoveStyle(vnode, rm) {
+  var s = vnode.data.style;
+  if (!s || !s.remove) {
+    rm();
+    return;
+  }
+  var name, elm = vnode.elm, idx, i = 0, maxDur = 0,
+      compStyle, style = s.remove, amount = 0, applied = [];
+  for (name in style) {
+    applied.push(name);
+    elm.style[name] = style[name];
+  }
+  compStyle = getComputedStyle(elm);
+  var props = compStyle['transition-property'].split(', ');
+  for (; i < props.length; ++i) {
+    if(applied.indexOf(props[i]) !== -1) amount++;
+  }
+  elm.addEventListener('transitionend', function(ev) {
+    if (ev.target === elm) --amount;
+    if (amount === 0) rm();
+  });
+}
+
+module.exports = {create: updateStyle, update: updateStyle, destroy: applyDestroyStyle, remove: applyRemoveStyle};
+
+},{}],15:[function(require,module,exports){
+// jshint newcap: false
+/* global require, module, document, Node */
+'use strict';
+
+var VNode = require('./vnode');
+var is = require('./is');
+var domApi = require('./htmldomapi');
+
+function isUndef(s) { return s === undefined; }
+function isDef(s) { return s !== undefined; }
+
+var emptyNode = VNode('', {}, [], undefined, undefined);
+
+function sameVnode(vnode1, vnode2) {
+  return vnode1.key === vnode2.key && vnode1.sel === vnode2.sel;
+}
+
+function createKeyToOldIdx(children, beginIdx, endIdx) {
+  var i, map = {}, key;
+  for (i = beginIdx; i <= endIdx; ++i) {
+    key = children[i].key;
+    if (isDef(key)) map[key] = i;
+  }
+  return map;
+}
+
+var hooks = ['create', 'update', 'remove', 'destroy', 'pre', 'post'];
+
+function init(modules, api) {
+  var i, j, cbs = {};
+
+  if (isUndef(api)) api = domApi;
+
+  for (i = 0; i < hooks.length; ++i) {
+    cbs[hooks[i]] = [];
+    for (j = 0; j < modules.length; ++j) {
+      if (modules[j][hooks[i]] !== undefined) cbs[hooks[i]].push(modules[j][hooks[i]]);
+    }
+  }
+
+  function emptyNodeAt(elm) {
+    return VNode(api.tagName(elm).toLowerCase(), {}, [], undefined, elm);
+  }
+
+  function createRmCb(childElm, listeners) {
+    return function() {
+      if (--listeners === 0) {
+        var parent = api.parentNode(childElm);
+        api.removeChild(parent, childElm);
+      }
+    };
+  }
+
+  function createElm(vnode, insertedVnodeQueue) {
+    var i, data = vnode.data;
+    if (isDef(data)) {
+      if (isDef(i = data.hook) && isDef(i = i.init)) {
+        i(vnode);
+        data = vnode.data;
+      }
+    }
+    var elm, children = vnode.children, sel = vnode.sel;
+    if (isDef(sel)) {
+      // Parse selector
+      var hashIdx = sel.indexOf('#');
+      var dotIdx = sel.indexOf('.', hashIdx);
+      var hash = hashIdx > 0 ? hashIdx : sel.length;
+      var dot = dotIdx > 0 ? dotIdx : sel.length;
+      var tag = hashIdx !== -1 || dotIdx !== -1 ? sel.slice(0, Math.min(hash, dot)) : sel;
+      elm = vnode.elm = isDef(data) && isDef(i = data.ns) ? api.createElementNS(i, tag)
+                                                          : api.createElement(tag);
+      if (hash < dot) elm.id = sel.slice(hash + 1, dot);
+      if (dotIdx > 0) elm.className = sel.slice(dot + 1).replace(/\./g, ' ');
+      if (is.array(children)) {
+        for (i = 0; i < children.length; ++i) {
+          api.appendChild(elm, createElm(children[i], insertedVnodeQueue));
+        }
+      } else if (is.primitive(vnode.text)) {
+        api.appendChild(elm, api.createTextNode(vnode.text));
+      }
+      for (i = 0; i < cbs.create.length; ++i) cbs.create[i](emptyNode, vnode);
+      i = vnode.data.hook; // Reuse variable
+      if (isDef(i)) {
+        if (i.create) i.create(emptyNode, vnode);
+        if (i.insert) insertedVnodeQueue.push(vnode);
+      }
+    } else {
+      elm = vnode.elm = api.createTextNode(vnode.text);
+    }
+    return vnode.elm;
+  }
+
+  function addVnodes(parentElm, before, vnodes, startIdx, endIdx, insertedVnodeQueue) {
+    for (; startIdx <= endIdx; ++startIdx) {
+      api.insertBefore(parentElm, createElm(vnodes[startIdx], insertedVnodeQueue), before);
+    }
+  }
+
+  function invokeDestroyHook(vnode) {
+    var i, j, data = vnode.data;
+    if (isDef(data)) {
+      if (isDef(i = data.hook) && isDef(i = i.destroy)) i(vnode);
+      for (i = 0; i < cbs.destroy.length; ++i) cbs.destroy[i](vnode);
+      if (isDef(i = vnode.children)) {
+        for (j = 0; j < vnode.children.length; ++j) {
+          invokeDestroyHook(vnode.children[j]);
+        }
+      }
+    }
+  }
+
+  function removeVnodes(parentElm, vnodes, startIdx, endIdx) {
+    for (; startIdx <= endIdx; ++startIdx) {
+      var i, listeners, rm, ch = vnodes[startIdx];
+      if (isDef(ch)) {
+        if (isDef(ch.sel)) {
+          invokeDestroyHook(ch);
+          listeners = cbs.remove.length + 1;
+          rm = createRmCb(ch.elm, listeners);
+          for (i = 0; i < cbs.remove.length; ++i) cbs.remove[i](ch, rm);
+          if (isDef(i = ch.data) && isDef(i = i.hook) && isDef(i = i.remove)) {
+            i(ch, rm);
+          } else {
+            rm();
+          }
+        } else { // Text node
+          api.removeChild(parentElm, ch.elm);
+        }
+      }
+    }
+  }
+
+  function updateChildren(parentElm, oldCh, newCh, insertedVnodeQueue) {
+    var oldStartIdx = 0, newStartIdx = 0;
+    var oldEndIdx = oldCh.length - 1;
+    var oldStartVnode = oldCh[0];
+    var oldEndVnode = oldCh[oldEndIdx];
+    var newEndIdx = newCh.length - 1;
+    var newStartVnode = newCh[0];
+    var newEndVnode = newCh[newEndIdx];
+    var oldKeyToIdx, idxInOld, elmToMove, before;
+
+    while (oldStartIdx <= oldEndIdx && newStartIdx <= newEndIdx) {
+      if (isUndef(oldStartVnode)) {
+        oldStartVnode = oldCh[++oldStartIdx]; // Vnode has been moved left
+      } else if (isUndef(oldEndVnode)) {
+        oldEndVnode = oldCh[--oldEndIdx];
+      } else if (sameVnode(oldStartVnode, newStartVnode)) {
+        patchVnode(oldStartVnode, newStartVnode, insertedVnodeQueue);
+        oldStartVnode = oldCh[++oldStartIdx];
+        newStartVnode = newCh[++newStartIdx];
+      } else if (sameVnode(oldEndVnode, newEndVnode)) {
+        patchVnode(oldEndVnode, newEndVnode, insertedVnodeQueue);
+        oldEndVnode = oldCh[--oldEndIdx];
+        newEndVnode = newCh[--newEndIdx];
+      } else if (sameVnode(oldStartVnode, newEndVnode)) { // Vnode moved right
+        patchVnode(oldStartVnode, newEndVnode, insertedVnodeQueue);
+        api.insertBefore(parentElm, oldStartVnode.elm, api.nextSibling(oldEndVnode.elm));
+        oldStartVnode = oldCh[++oldStartIdx];
+        newEndVnode = newCh[--newEndIdx];
+      } else if (sameVnode(oldEndVnode, newStartVnode)) { // Vnode moved left
+        patchVnode(oldEndVnode, newStartVnode, insertedVnodeQueue);
+        api.insertBefore(parentElm, oldEndVnode.elm, oldStartVnode.elm);
+        oldEndVnode = oldCh[--oldEndIdx];
+        newStartVnode = newCh[++newStartIdx];
+      } else {
+        if (isUndef(oldKeyToIdx)) oldKeyToIdx = createKeyToOldIdx(oldCh, oldStartIdx, oldEndIdx);
+        idxInOld = oldKeyToIdx[newStartVnode.key];
+        if (isUndef(idxInOld)) { // New element
+          api.insertBefore(parentElm, createElm(newStartVnode, insertedVnodeQueue), oldStartVnode.elm);
+          newStartVnode = newCh[++newStartIdx];
+        } else {
+          elmToMove = oldCh[idxInOld];
+          patchVnode(elmToMove, newStartVnode, insertedVnodeQueue);
+          oldCh[idxInOld] = undefined;
+          api.insertBefore(parentElm, elmToMove.elm, oldStartVnode.elm);
+          newStartVnode = newCh[++newStartIdx];
+        }
+      }
+    }
+    if (oldStartIdx > oldEndIdx) {
+      before = isUndef(newCh[newEndIdx+1]) ? null : newCh[newEndIdx+1].elm;
+      addVnodes(parentElm, before, newCh, newStartIdx, newEndIdx, insertedVnodeQueue);
+    } else if (newStartIdx > newEndIdx) {
+      removeVnodes(parentElm, oldCh, oldStartIdx, oldEndIdx);
+    }
+  }
+
+  function patchVnode(oldVnode, vnode, insertedVnodeQueue) {
+    var i, hook;
+    if (isDef(i = vnode.data) && isDef(hook = i.hook) && isDef(i = hook.prepatch)) {
+      i(oldVnode, vnode);
+    }
+    var elm = vnode.elm = oldVnode.elm, oldCh = oldVnode.children, ch = vnode.children;
+    if (oldVnode === vnode) return;
+    if (!sameVnode(oldVnode, vnode)) {
+      var parentElm = api.parentNode(oldVnode.elm);
+      elm = createElm(vnode, insertedVnodeQueue);
+      api.insertBefore(parentElm, elm, oldVnode.elm);
+      removeVnodes(parentElm, [oldVnode], 0, 0);
+      return;
+    }
+    if (isDef(vnode.data)) {
+      for (i = 0; i < cbs.update.length; ++i) cbs.update[i](oldVnode, vnode);
+      i = vnode.data.hook;
+      if (isDef(i) && isDef(i = i.update)) i(oldVnode, vnode);
+    }
+    if (isUndef(vnode.text)) {
+      if (isDef(oldCh) && isDef(ch)) {
+        if (oldCh !== ch) updateChildren(elm, oldCh, ch, insertedVnodeQueue);
+      } else if (isDef(ch)) {
+        if (isDef(oldVnode.text)) api.setTextContent(elm, '');
+        addVnodes(elm, null, ch, 0, ch.length - 1, insertedVnodeQueue);
+      } else if (isDef(oldCh)) {
+        removeVnodes(elm, oldCh, 0, oldCh.length - 1);
+      } else if (isDef(oldVnode.text)) {
+        api.setTextContent(elm, '');
+      }
+    } else if (oldVnode.text !== vnode.text) {
+      api.setTextContent(elm, vnode.text);
+    }
+    if (isDef(hook) && isDef(i = hook.postpatch)) {
+      i(oldVnode, vnode);
+    }
+  }
+
+  return function(oldVnode, vnode) {
+    var i, elm, parent;
+    var insertedVnodeQueue = [];
+    for (i = 0; i < cbs.pre.length; ++i) cbs.pre[i]();
+
+    if (isUndef(oldVnode.sel)) {
+      oldVnode = emptyNodeAt(oldVnode);
+    }
+
+    if (sameVnode(oldVnode, vnode)) {
+      patchVnode(oldVnode, vnode, insertedVnodeQueue);
+    } else {
+      elm = oldVnode.elm;
+      parent = api.parentNode(elm);
+
+      createElm(vnode, insertedVnodeQueue);
+
+      if (parent !== null) {
+        api.insertBefore(parent, vnode.elm, api.nextSibling(elm));
+        removeVnodes(parent, [oldVnode], 0, 0);
+      }
+    }
+
+    for (i = 0; i < insertedVnodeQueue.length; ++i) {
+      insertedVnodeQueue[i].data.hook.insert(insertedVnodeQueue[i]);
+    }
+    for (i = 0; i < cbs.post.length; ++i) cbs.post[i]();
+    return vnode;
+  };
+}
+
+module.exports = {init: init};
+
+},{"./htmldomapi":9,"./is":10,"./vnode":16}],16:[function(require,module,exports){
+module.exports = function(sel, data, children, text, elm) {
+  var key = data === undefined ? undefined : data.key;
+  return {sel: sel, data: data, children: children,
+          text: text, elm: elm, key: key};
+};
+
+},{}],17:[function(require,module,exports){
+'use strict';
+
+const Rx = require('rx');
+const $ = Rx.Observable;
+
+const obj = require('../util/obj');
+
+const switchFn = (value, options) => options[value] || options['default'] || false;
+
+const stream = new Rx.Subject();
+
+const init = () => stream.onNext(
+	state => ({
+		player: {
+			position: {
+				x: 0,
+				y: 0
+			},
+			direction: 'right',
+			status: 'idle',
+			frame: 0,
+			force: 0
+		}
+	})
+);
+
+const move = (direction, force) => stream.onNext(
+	state => obj.patch(state, 'player', {
+		force,
+		direction: direction || state.player.direction
+	})
+);
+
+const jump = () => stream.onNext(state => obj.patch(state, ['player', 'status'], 'jumping'));
+
+const tick = () => stream.onNext(
+	state => obj.patch(state, 'player', {
+		position: {
+			x: state.player.position.x + state.player.force *
+				((state.player.direction === 'right') ? 1 : -1),
+			y: state.player.position.y + ((state.player.status === 'jumping')
+				? (state.player.frame < 10)
+					? 10
+					: -10
+				: 0)
+		},
+		status: switchFn(state.player.status, {
+			'jumping': (state.player.frame === 19) ? 'idle' : 'jumping',
+			'default': 'idle'
+		}),
+		frame: (state.player.status === 'jumping' && state.player.frame < 19)
+			? state.player.frame + 1
+			: 0
+	})
+);
+
+module.exports = {
+	stream,
+	init,
+	move,
+	jump,
+	tick
+};
+
+},{"../util/obj":22,"rx":7}],18:[function(require,module,exports){
+
+const {section} = require('../util/vdom');
+
+module.exports = state => section('#game', [
+	section('#player', {
+		style: {
+			left: state.player.position.x,
+			bottom: (128 + state.player.position.y)
+		},
+		class: {
+			left: state.player.direction === 'left'
+		}
+	}),
+	section('#ground')
+]);
+
+},{"../util/vdom":24}],19:[function(require,module,exports){
+'use strict';
+
+const Rx = require('rx');
+const $ = Rx.Observable;
+
+const vdom = require('./util/vdom');
+
+const keyboard = require('./util/keyboard');
+const gamepad = require('./util/gamepad');
+const time = require('./util/time');
+const obj = require('./util/obj');
+
+const actions = require('./actions');
+const game = require('./game');
+
+const switchFn = (value, options) => options[value] || options['default'] || false;
+
+const pressedKeys$ = keyboard.watch(['left', 'right', 'up', 'down', 'shift']);
+
+const getDirection = keys => keys.left && 'left' || keys.right && 'right' || false;
+const getForce = keys => (keys.shift && 10 || 5) * ((keys.left || keys.right) ? 1 : 0);
+
+const position$ = pressedKeys$
+	// .filter(keys => keys.up || keys.down || keys.left || keys.right)
+	.map(keys => (console.log('keys', keys), keys))
+	.subscribe(keys => actions.move(getDirection(keys), getForce(keys)));
+
+const jump$ = keyboard.on('space')
+	.map(ev => (console.log(ev), ev))
+	.subscribe(() => actions.jump());
+
+// move
+gamepad.changes()
+	.map(pads => (console.log({pads}), pads))
+	// .withLatestFrom(pressedKeys$, (pads, keys) => ({pads, keys}))
+	.subscribe(pads => actions.move(
+		pads[0].axes[0] < 0 && 'left' || pads[0].axes[0] > 0 && 'right' || false,
+		pads[0].axes[0] !== 0 && 5 || 0
+	));
+
+const state$ = actions.stream
+	.scan((state, reducer) => reducer(state), {})
+	.distinctUntilChanged(state => state)
+	.map(state => (console.log(state), state))
+	.share();
+
+const game$ = state$.map(game);
+
+// game loop tick
+time.frame().subscribe(actions.tick);
+
+vdom.patchStream(game$, '#game');
+
+window.actions = actions;
+
+},{"./actions":17,"./game":18,"./util/gamepad":20,"./util/keyboard":21,"./util/obj":22,"./util/time":23,"./util/vdom":24,"rx":7}],20:[function(require,module,exports){
+'use strict';
+
+const Rx = require('rx');
+const $ = Rx.Observable;
+
+const time = require('./time');
+
+const parsePad = pad => pad && ({
+	axes: pad.axes,
+	buttons: pad.buttons.map(button => ({
+		pressed: button.pressed,
+		value: button.value
+	})),
+	connected: pad.connected,
+	id: pad.id,
+	index: pad.index,
+	mapping: pad.mapping,
+	timestamp: pad.timestamp
+}) || pad;
+
+const list = () => Array.from(navigator.getGamepads() || navigator.webkitGetGamepads() || [])
+	.map(parsePad);
+
+const changes = () => time.frame()
+	.map(list)
+	.distinctUntilChanged(pads => pads)
+	//	pads.reduce((r, pad) => !pad && r || (r + (pad.axes || '') + (pad.buttons || '')), ''))
+	.share();
+
+module.exports = {
+	list,
+	changes
+};
+
+},{"./time":23,"rx":7}],21:[function(require,module,exports){
+'use strict';
+
+const Rx = require('rx');
+const $ = Rx.Observable;
+
+const obj = require('../util/obj');
+
+const keyDown$ = $.fromEvent(document, 'keydown');
+const keyUp$ = $.fromEvent(document, 'keyup');
+const keyAction$ = $.merge(keyDown$, keyUp$).map(ev => (console.log(ev), ev));
+
+const keyAliases = {
+	'ArrowUp': 'up',
+	'ArrowDown': 'down',
+	'ArrowLeft': 'left',
+	'ArrowRight': 'right',
+	' ': 'space',
+	'Shift': 'shift'
+};
+
+const charCodes = {
+
+};
+
+const parseKey = ev => keyAliases[ev.key] || charCodes[ev.keyCode] || ev.key;
+
+const watch = keyList => keyAction$
+	.distinctUntilChanged(ev => ev.type + (ev.key || ev.which))
+	.map(ev => ({type: ev.type, key: parseKey(ev)}))
+	.filter(ev => keyList.indexOf(ev.key) > -1)
+	.scan((keys, ev) => obj.patch(keys, ev.key, (ev.type === 'keydown')), {})
+	.share();
+
+const on = key => keyDown$.filter(ev => parseKey(ev) === key);
+
+module.exports = {
+	watch,
+	on
+};
+
+},{"../util/obj":22,"rx":7}],22:[function(require,module,exports){
+'use strict';
+
+const keyValue = (k, v) => {
+	let o = {};
+	o[k] = v;
+	return o;
+};
+
+const patch = (o, k, v) => Object.assign({}, o,
+	(k instanceof Array)
+		? keyValue(k[0], (k.length > 1)
+			? patch(o[k[0]] || {}, k.slice(1), v)
+			: typeof o[k[0]] === 'object' && Object.assign({}, o[k[0]], v) || v)
+		: keyValue(k, typeof o[k] === 'object' && Object.assign({}, o[k], v) || v)
+);
+
+console.log(patch({}, ['a', 'b', 'c'], 'boom'));
+console.log(patch({}, 'x', 1));
+console.log(['a', 'b', 'c'].slice(1));
+
+console.log(patch({a: {d: '1'}}, 'a', {g: 2}));
+
+module.exports = {
+	keyValue,
+	patch
+};
+
+},{}],23:[function(require,module,exports){
 'use strict';
 
 const Rx = require('rx');
 const $ = Rx.Observable;
 
 const RxNode = require('rx-node');
-
 const raf = require('raf-stream');
 
-const keyDowns$ = $.fromEvent(document, 'keydown');
-const keyUps$ = $.fromEvent(document, 'keyup');
-const keyActions$ = $.merge(keyDowns$, keyUps$)
-	.distinctUntilChanged(e => e.type + (e.key || e.which))
-	.map(data => (console.log(data), data))
-	.map(data => state =>
-		Object.assign({}, state, {
-			keys: (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].indexOf(data.key) > -1)
-				? (data.type === 'keyup')
-					? state.keys.filter(key => key !== data.key)
-					: state.keys.concat([data.key])
-				: state.keys
-		})
-	);
+const frame = node => RxNode.fromStream(raf(node))
+	.filter(dt => dt !== 0)
+	.share();
 
-const initialState$ = $.just(state => ({
-	keys: []
-}));
+const loop = (state$, node) => frame(node).withLatestFrom(state$, (dt, state) => ({dt, state}));
 
-const state$ = $.merge(initialState$, keyActions$)
-	.scan((state, reducer) => reducer(state), {})
-	.map(state => (console.log(state), state));
+module.exports = {
+	frame,
+	loop
+};
 
-const raf$ = RxNode.fromStream(raf())
-	.filter(dt => dt !== 0);
+},{"raf-stream":4,"rx":7,"rx-node":6}],24:[function(require,module,exports){
+'use strict';
 
-const gameLoop$ = raf$.withLatestFrom(state$, (dt, state) => {
-	let player = document.getElementById('player');
-	if (state.keys.indexOf('ArrowLeft') > -1)
-		player.style.left = (parseInt(player.style.left.replace('px', ''), 10) - 10) || 0;
-	if (state.keys.indexOf('ArrowRight') > -1)
-		player.style.left = (parseInt(player.style.left.replace('px', ''), 10) + 10) || 0;
+const snabbdom = require('snabbdom');
+const h = require('snabbdom/h');
 
-	// console.log(player.style.left);
-}).subscribe();
+const patch = snabbdom.init([ // Init patch function with choosen modules
+	require('snabbdom/modules/class'), // makes it easy to toggle classes
+	require('snabbdom/modules/props'), // for setting properties on DOM elements
+	require('snabbdom/modules/style'), // handles styling on elements with support for animations
+	require('snabbdom/modules/eventlisteners') // attaches event listeners
+]);
 
-// raf().on('data', dt => console.log('difference in time is ' + dt + 'ms'));
+const patchStream = (stream, dom) => {
+	dom = (typeof dom === 'string') ? document.querySelector(dom) : dom;
+	stream.scan(
+		(vnode, newVnode) => patch(vnode, newVnode),
+		dom
+	).subscribe();
+};
 
-// raf$.subscribe(dt => console.log('difference in time is ' + dt + 'ms'));
+const hyperHelpers = [
+	'h1', 'h2', 'h3', 'h4', 'section', 'header', 'article',
+	'div', 'p', 'span', 'pre', 'code', 'a', 'dd', 'dt', 'hr', 'br', 'b', 'i',
+	'table', 'thead', 'tbody', 'th', 'tr', 'td', 'ul', 'ol', 'li',
+	'form', 'fieldset', 'legend', 'input', 'label', 'button', 'select', 'option',
+	'canvas', 'video'
+].reduce(
+	(o, tag) => {
+		o[tag] = function() {
+			return [Array.prototype.slice.call(arguments)]
+				.map(
+					args => (
+						args[0] && typeof args[0] === 'string'
+						&& args[0].match(/^(\.|#)[a-zA-Z\-_0-9]+/ig))
+						? [].concat(tag + args[0], args.slice(1))
+						: [tag].concat(args))
+				.map(args => h.apply(this, args))
+				.pop();
+		};
+		return o;
+	}, {}
+);
 
-},{"raf-stream":4,"rx":7,"rx-node":6}]},{},[8]);
+module.exports = Object.assign(
+	{
+		h,
+		patch,
+		patchStream
+	},
+	hyperHelpers
+);
+
+},{"snabbdom":15,"snabbdom/h":8,"snabbdom/modules/class":11,"snabbdom/modules/eventlisteners":12,"snabbdom/modules/props":13,"snabbdom/modules/style":14}]},{},[19]);

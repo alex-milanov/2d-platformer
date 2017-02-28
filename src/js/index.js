@@ -3,46 +3,52 @@
 const Rx = require('rx');
 const $ = Rx.Observable;
 
-const RxNode = require('rx-node');
+const vdom = require('./util/vdom');
 
-const raf = require('raf-stream');
+const keyboard = require('./util/keyboard');
+const gamepad = require('./util/gamepad');
+const time = require('./util/time');
+const obj = require('./util/obj');
 
-const keyDowns$ = $.fromEvent(document, 'keydown');
-const keyUps$ = $.fromEvent(document, 'keyup');
-const keyActions$ = $.merge(keyDowns$, keyUps$)
-	.distinctUntilChanged(e => e.type + (e.key || e.which))
-	.map(data => (console.log(data), data))
-	.map(data => state =>
-		Object.assign({}, state, {
-			keys: (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].indexOf(data.key) > -1)
-				? (data.type === 'keyup')
-					? state.keys.filter(key => key !== data.key)
-					: state.keys.concat([data.key])
-				: state.keys
-		})
-	);
+const actions = require('./actions');
+const game = require('./game');
 
-const initialState$ = $.just(state => ({
-	keys: []
-}));
+const switchFn = (value, options) => options[value] || options['default'] || false;
 
-const state$ = $.merge(initialState$, keyActions$)
+const pressedKeys$ = keyboard.watch(['left', 'right', 'up', 'down', 'shift']);
+
+const getDirection = keys => keys.left && 'left' || keys.right && 'right' || false;
+const getForce = keys => (keys.shift && 10 || 5) * ((keys.left || keys.right) ? 1 : 0);
+
+const position$ = pressedKeys$
+	// .filter(keys => keys.up || keys.down || keys.left || keys.right)
+	.map(keys => (console.log('keys', keys), keys))
+	.subscribe(keys => actions.move(getDirection(keys), getForce(keys)));
+
+const jump$ = keyboard.on('space')
+	.map(ev => (console.log(ev), ev))
+	.subscribe(() => actions.jump());
+
+// move
+gamepad.changes()
+	.map(pads => (console.log({pads}), pads))
+	// .withLatestFrom(pressedKeys$, (pads, keys) => ({pads, keys}))
+	.subscribe(pads => actions.move(
+		pads[0].axes[0] < 0 && 'left' || pads[0].axes[0] > 0 && 'right' || false,
+		pads[0].axes[0] !== 0 && 5 || 0
+	));
+
+const state$ = actions.stream
 	.scan((state, reducer) => reducer(state), {})
-	.map(state => (console.log(state), state));
+	.distinctUntilChanged(state => state)
+	.map(state => (console.log(state), state))
+	.share();
 
-const raf$ = RxNode.fromStream(raf())
-	.filter(dt => dt !== 0);
+const game$ = state$.map(game);
 
-const gameLoop$ = raf$.withLatestFrom(state$, (dt, state) => {
-	let player = document.getElementById('player');
-	if (state.keys.indexOf('ArrowLeft') > -1)
-		player.style.left = (parseInt(player.style.left.replace('px', ''), 10) - 10) || 0;
-	if (state.keys.indexOf('ArrowRight') > -1)
-		player.style.left = (parseInt(player.style.left.replace('px', ''), 10) + 10) || 0;
+// game loop tick
+time.frame().subscribe(actions.tick);
 
-	// console.log(player.style.left);
-}).subscribe();
+vdom.patchStream(game$, '#game');
 
-// raf().on('data', dt => console.log('difference in time is ' + dt + 'ms'));
-
-// raf$.subscribe(dt => console.log('difference in time is ' + dt + 'ms'));
+window.actions = actions;
