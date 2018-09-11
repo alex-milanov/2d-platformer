@@ -2,6 +2,12 @@
 @import "bourbon"
 @import "neat"
 
+@keyframes walk
+	0%
+		background-position: -64px
+	50%
+		 background-position: -128px
+
 #game
 	display: block
 	position: absolute
@@ -17,7 +23,7 @@
 		bottom: 0px
 		right: 0px
 		height: 128px
-		background: url("../../assets/ground-grass.png") top left repeat-x, url("../../assets/ground.png") 0px 64px repeat
+		background: url("../assets/ground-grass-3.png") top left repeat-x, url("../assets/ground-4.png") 0px 64px repeat
 		background-size: 64px
 	#player
 		display: block
@@ -27,7 +33,13 @@
 		right: 0px
 		height: 64px
 		width: 64px
-		background: url("../../assets/player.png") center no-repeat
-		background-size: 42px
+		background: url("../assets/player.png") left center
+		background-size: 192px
+		transform: scaleX(-1)
 		&.left
-			transform: scaleX(-1)
+			transform: scaleX(1)
+		&.walking
+			//background-position: -64px
+			animation: walk 0.5s steps(1) infinite
+		&.running
+			animation: walk 0.4s steps(1) infinite

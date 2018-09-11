@@ -3,37 +3,32 @@
 const Rx = require('rx');
 const $ = Rx.Observable;
 
-const obj = require('../util/obj');
+const {obj} = require('iblokz-data');
 
-const switchFn = (value, options) => options[value] || options['default'] || false;
+// const switchFn = (value, options) => options[value] || options['default'] || false;
 
-const stream = new Rx.Subject();
+const initial = {
+	player: {
+		position: {
+			x: 0,
+			y: 0
+		},
+		direction: 'right',
+		status: 'idle',
+		frame: 0,
+		force: 0
+	}
+};
 
-const init = () => stream.onNext(
-	state => ({
-		player: {
-			position: {
-				x: 0,
-				y: 0
-			},
-			direction: 'right',
-			status: 'idle',
-			frame: 0,
-			force: 0
-		}
-	})
-);
-
-const move = (direction, force) => stream.onNext(
+const move = (direction, force) =>
 	state => obj.patch(state, 'player', {
 		force,
 		direction: direction || state.player.direction
-	})
-);
+	});
 
-const jump = () => stream.onNext(state => obj.patch(state, ['player', 'status'], 'jumping'));
+const jump = () => state => obj.patch(state, ['player', 'status'], 'jumping');
 
-const tick = () => stream.onNext(
+const tick = () =>
 	state => obj.patch(state, 'player', {
 		position: {
 			x: state.player.position.x + state.player.force *
@@ -44,19 +39,22 @@ const tick = () => stream.onNext(
 					: -10
 				: 0)
 		},
-		status: switchFn(state.player.status, {
+		status: obj.switch(state.player.status, {
 			'jumping': (state.player.frame === 19) ? 'idle' : 'jumping',
-			'default': 'idle'
+			'default':
+				state.player.force === 3
+					? 'running'
+					: state.player.force === 2
+						? 'walking'
+						: 'idle'
 		}),
 		frame: (state.player.status === 'jumping' && state.player.frame < 19)
 			? state.player.frame + 1
 			: 0
-	})
-);
+	});
 
 module.exports = {
-	stream,
-	init,
+	initial,
 	move,
 	jump,
 	tick

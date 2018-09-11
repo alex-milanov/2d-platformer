@@ -4,6 +4,12 @@ html {
 *, *::after, *::before {
   box-sizing: inherit; }
 
+@keyframes walk {
+  0% {
+    background-position: -64px; }
+  50% {
+    background-position: -128px; } }
+
 #game {
   display: block;
   position: absolute;
@@ -20,7 +26,7 @@ html {
     bottom: 0px;
     right: 0px;
     height: 128px;
-    background: url("../../assets/ground-grass.png") top left repeat-x, url("../../assets/ground.png") 0px 64px repeat;
+    background: url("../assets/ground-grass-3.png") top left repeat-x, url("../assets/ground-4.png") 0px 64px repeat;
     background-size: 64px; }
   #game #player {
     display: block;
@@ -30,7 +36,14 @@ html {
     right: 0px;
     height: 64px;
     width: 64px;
-    background: url("../../assets/player.png") center no-repeat;
-    background-size: 42px; }
+    background: url("../assets/player.png") left center;
+    background-size: 192px;
+    transform: scaleX(-1); }
     #game #player.left {
-      transform: scaleX(-1); }
+      transform: scaleX(1); }
+    #game #player.walking {
+      animation: walk 0.5s steps(1) infinite; }
+    #game #player.running {
+      animation: walk 0.4s steps(1) infinite; }
+
+/*# sourceMappingURL=style.css.map */
