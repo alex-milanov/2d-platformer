@@ -28,6 +28,13 @@ html {
     height: 128px;
     background: url("../assets/ground-grass-3.png") top left repeat-x, url("../assets/ground-4.png") 0px 64px repeat;
     background-size: 64px; }
+  #game .box {
+    display: block;
+    position: absolute;
+    background: url("../assets/ground-grass-3.png") top left no-repeat;
+    background-size: 64px;
+    width: 64px;
+    height: 64px; }
   #game #player {
     display: block;
     position: absolute;

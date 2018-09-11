@@ -39,20 +39,21 @@ if (module.hot) {
 
 // actions -> state
 actions$
-	.map(action => (
-		action.path && console.log(action.path.join('.'), action.payload),
-		console.log(action),
-		action
-	))
+	// .map(action => (
+	// 	action.path && console.log(action.path.join('.'), action.payload),
+	// 	console.log(action),
+	// 	action
+	// ))
 	.startWith(() => actions.initial)
 	.scan((state, change) => change(state), {})
+	.distinctUntilChanged(state => state)
 	.map(state => (console.log(state), state))
 	.subscribe(state => state$.onNext(state));
 
 const pressedKeys$ = keyboard.watch(['left', 'right', 'up', 'down', 'shift']);
 
 const getDirection = keys => keys.left && 'left' || keys.right && 'right' || false;
-const getForce = keys => (keys.shift && 3 || 2) * ((keys.left || keys.right) ? 1 : 0);
+const getForce = keys => (keys.shift && 4 || 3) * ((keys.left || keys.right) ? 1 : 0);
 
 const position$ = pressedKeys$
 	// .filter(keys => keys.up || keys.down || keys.left || keys.right)
