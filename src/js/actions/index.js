@@ -38,6 +38,10 @@ const initial = {
 		{
 			left: 896,
 			bottom: 192
+		},
+		{
+			left: 1024,
+			bottom: 320
 		}
 	]
 };
@@ -48,7 +52,11 @@ const move = (direction, force) =>
 		direction: direction || state.player.direction
 	});
 
-const jump = () => state => obj.patch(state, ['player', 'status'], 'jumping');
+const jump = () => state => obj.patch(state, ['player', 'status'],
+	['jumping', 'falling'].indexOf(state.player.status) === -1
+		? 'jumping'
+		: state.player.status
+);
 
 const collides = (oldPos, newPos, obstacles) =>
 	obstacles.reduce(
@@ -56,15 +64,15 @@ const collides = (oldPos, newPos, obstacles) =>
 			x: isColliding.x
 				|| (!((oldPos.y + 64) <= obst.bottom || oldPos.y >= (obst.bottom + 64))
 					&& (
-						!((newPos.x + 64) <= obst.left) && oldPos.x <= (obst.left - 64) && (obst.left - 65)
-						|| !(newPos.x >= (obst.left + 64)) && oldPos.x >= (obst.left + 64) && obst.left + 65
+						!((newPos.x + 64) <= obst.left) && oldPos.x <= (obst.left - 63) && (obst.left - 64)
+						|| !(newPos.x >= (obst.left + 64)) && oldPos.x >= (obst.left + 63) && obst.left + 64
 					)
 				),
 			y: isColliding.y
 				|| (!((oldPos.x + 64) <= obst.left || oldPos.x >= (obst.left + 64))
 					&& (
-						!((newPos.y + 64) <= obst.bottom) && oldPos.y <= (obst.bottom - 64) && (obst.bottom - 65)
-						|| !(newPos.y >= (obst.bottom + 64)) && oldPos.y >= (obst.bottom + 64) && (obst.bottom + 65)
+						!((newPos.y + 64) <= obst.bottom) && oldPos.y <= (obst.bottom - 63) && (obst.bottom - 64)
+						|| !(newPos.y >= (obst.bottom + 64)) && oldPos.y >= (obst.bottom + 63) && (obst.bottom + 64)
 					)
 				)
 		}),
@@ -75,13 +83,16 @@ const calculatePos = player => ({
 	x: player.position.x + player.force *
 		((player.direction === 'right') ? 1 : -1),
 	y: player.position.y + ((player.status === 'jumping')
-		? 14
-		: player.position.y - 16 > 0 ? -16 : -player.position.y)
+		? 12
+		: player.status === 'falling' || player.position.y - 16 > 0
+			? -16
+			: -player.position.y
+		)
 });
 
 const tick = () =>
-	state => obj.patch(state, 'player', {
-		position: fn.pipe(
+	state => obj.patch(state, 'player',
+		fn.pipe(
 			() => calculatePos(state.player),
 			newPos => ({
 				newPos,
@@ -89,23 +100,30 @@ const tick = () =>
 			}),
 			// data => ((data.collides.x || data.collides.y) && console.log(data), data),
 			({newPos, collides}) => ({
-				x: collides.x || newPos.x,
-				y: collides.y || newPos.y
+				position: {
+					x: collides.x || newPos.x,
+					y: collides.y || newPos.y
+				},
+				status: obj.switch(state.player.status, {
+					'jumping': (collides.y || state.player.frame === 16 || newPos.y < state.player.position.y)
+						? collides.y && collides.y < state.player.position.y
+							? 'idle'
+							: 'falling'
+						: 'jumping',
+					'falling': collides.y || newPos.y <= 0 ? 'idle' : 'falling',
+					'default':
+						state.player.force === 4
+							? 'running'
+							: state.player.force === 3
+								? 'walking'
+								: 'idle'
+				}),
+				frame: (state.player.status === 'jumping' && state.player.frame < 16 && !(collides.y))
+					? state.player.frame + 1
+					: 0
 			})
-		)(),
-		status: obj.switch(state.player.status, {
-			'jumping': (state.player.frame === 14) ? 'idle' : 'jumping',
-			'default':
-				state.player.force === 4
-					? 'running'
-					: state.player.force === 3
-						? 'walking'
-						: 'idle'
-		}),
-		frame: (state.player.status === 'jumping' && state.player.frame < 14)
-			? state.player.frame + 1
-			: 0
-	});
+		)()
+	);
 
 module.exports = {
 	initial,
